@@ -109,4 +109,3 @@ replace github.com/deislabs/oras => github.com/werf/third-party-oras v0.9.1-0.20
 replace helm.sh/helm/v3 => github.com/werf/helm/v3 v3.0.0-20211112190515-e733b755e5af
 
 replace github.com/containers/buildah => ../../containers/buildah
-replace github.com/containers/common => ../../containers/common
