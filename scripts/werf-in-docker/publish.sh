@@ -2,5 +2,6 @@
 
 set -e
 
-IMAGE_NAME=ghcr.io/werf/werf:"$(git rev-parse HEAD)"
+# FIXME(ilya-lesikov):
+IMAGE_NAME=ilyalesikov/test:"$(git rev-parse HEAD)"
 docker push $IMAGE_NAME
