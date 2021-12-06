@@ -3,5 +3,6 @@
 set -e
 
 BUILD_VERSION="$(git rev-parse HEAD)"
-IMAGE_NAME=ghcr.io/werf/werf:$BUILD_VERSION
+# FIXME(ilya-lesikov):
+IMAGE_NAME=ilyalesikov/test:$BUILD_VERSION
 docker build -f scripts/werf-in-docker/Dockerfile --build-arg build_version=$BUILD_VERSION -t $IMAGE_NAME .

@@ -21,8 +21,9 @@ ARG build_version
 # up space.
 RUN useradd build
 RUN yum -y update
-RUN rpm --restore shadow-utils 2>/dev/null
-RUN yum -y install buildah fuse-overlayfs xz --exclude container-selinux
+#RUN rpm --restore shadow-utils 2>/dev/null
+#RUN yum -y install buildah xz --exclude container-selinux
+RUN yum -y install fuse-overlayfs git
 RUN rm -rf /var/cache /var/log/dnf* /var/log/yum.*
 
 RUN yum install -y git curl gpg
@@ -37,8 +38,8 @@ RUN yum install -y git curl gpg
 RUN echo build:2000:50000 >/etc/subuid && echo build:2000:50000 >/etc/subgid
 
 #FIXME(ilya-lesikov):
-#RUN mkdir -p /home/build/.local/share/containers
-#RUN chown -R build:build /home/build
+RUN mkdir -p /home/build/.local/share/containers
+RUN chown -R build:build /home/build
 
 VOLUME /var/lib/containers
 VOLUME /home/build/.local/share/containers
