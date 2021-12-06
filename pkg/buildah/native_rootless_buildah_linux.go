@@ -218,7 +218,7 @@ func (b *NativeRootlessBuildah) RunCommand(ctx context.Context, container string
 	runOpts := buildah.RunOptions{
 		Args:      opts.Args,
 		Isolation: define.Isolation(b.Isolation),
-		Mounts: opts.Mounts,
+		Mounts:    opts.Mounts,
 	}
 
 	stderr := &bytes.Buffer{}
