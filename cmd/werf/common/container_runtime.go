@@ -31,7 +31,7 @@ func GetContainerRuntimeBuildahMode() buildah.Mode {
 }
 
 func GetContainerRuntimeBuildahIsolation() (*types.Isolation, error) {
-	isolationRaw := os.Getenv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION")
+	isolationRaw := os.Getenv("WERF_BUILDAH_ISOLATION")
 	var isolation types.Isolation
 	switch isolationRaw {
 	case "rootless", "oci-rootless":
@@ -56,7 +56,7 @@ func GetContainerRuntimeBuildahIsolation() (*types.Isolation, error) {
 }
 
 func GetContainerRuntimeBuildahStorageDriver() (*buildah.StorageDriver, error) {
-	storageDriverRaw := os.Getenv("WERF_CONTAINER_RUNTIME_BUILDAH_STORAGE_DRIVER")
+	storageDriverRaw := os.Getenv("WERF_BUILDAH_STORAGE_DRIVER")
 	var storageDriver buildah.StorageDriver
 	switch storageDriverRaw {
 	case string(buildah.StorageDriverOverlay), string(buildah.StorageDriverVFS):

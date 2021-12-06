@@ -172,11 +172,11 @@ func setupEnv(withLocalRepo bool, containerRuntime, isolation string) {
 
 	switch isolation {
 	case "rootless":
-		SuiteData.Stubs.SetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION", "rootless")
+		SuiteData.Stubs.SetEnv("WERF_BUILDAH_ISOLATION", "rootless")
 	case "chroot":
-		SuiteData.Stubs.SetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION", "chroot")
+		SuiteData.Stubs.SetEnv("WERF_BUILDAH_ISOLATION", "chroot")
 	case "":
-		SuiteData.Stubs.UnsetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION")
+		SuiteData.Stubs.UnsetEnv("WERF_BUILDAH_ISOLATION")
 	default:
 		panic("unexpected isolation")
 	}
