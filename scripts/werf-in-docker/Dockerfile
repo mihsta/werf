@@ -50,4 +50,4 @@ VOLUME /home/build/.local/share/containers
 
 COPY --from=0 /werf/release-build/$build_version/linux-amd64/bin/werf /usr/local/bin/werf
 
-ENV WERF_CONTAINER_RUNTIME=buildah
+ENV WERF_CONTAINER_RUNTIME_BUILDAH=auto

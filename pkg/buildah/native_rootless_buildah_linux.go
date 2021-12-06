@@ -36,6 +36,8 @@ import (
 const (
 	MaxPullPushRetries = 3
 	PullPushRetryDelay = 2 * time.Second
+	AutoUserNsMinSize  = 2000
+	AutoUserNsMaxSize  = 50000
 )
 
 func NativeRootlessProcessStartupHook() bool {
@@ -381,7 +383,7 @@ func NewNativeStoreOptions(rootlessUID int, driver StorageDriver) (*types.StoreO
 		RootlessStoragePath: rootlessStoragePath,
 		GraphDriverName:     string(driver),
 		GraphDriverOptions:  graphDriverOptions,
-		AutoNsMinSize:       storage.AutoUserNsMinSize,
-		AutoNsMaxSize:       storage.AutoUserNsMaxSize,
+		AutoNsMinSize:       AutoUserNsMinSize,
+		AutoNsMaxSize:       AutoUserNsMaxSize,
 	}, nil
 }
