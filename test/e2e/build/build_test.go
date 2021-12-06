@@ -6,7 +6,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-
 	"github.com/werf/werf/test/pkg/contruntime"
 	"github.com/werf/werf/test/pkg/thirdparty/contruntime/manifest"
 	"github.com/werf/werf/test/pkg/werf"
@@ -14,9 +13,9 @@ import (
 
 var _ = Describe("Build", func() {
 	DescribeTable("should succeed and produce expected image",
-		func(withLocalRepo bool, containerRuntime string) {
+		func(withLocalRepo bool, containerRuntime, isolation string) {
 			By("initializing")
-			setupEnv(withLocalRepo, containerRuntime)
+			setupEnv(withLocalRepo, containerRuntime, isolation)
 			contRuntime, err := contruntime.NewContainerRuntime(containerRuntime)
 			if err == contruntime.ErrRuntimeUnavailable {
 				Skip(err.Error())
@@ -49,9 +48,8 @@ var _ = Describe("Build", func() {
 				config := contRuntime.GetImageInspectConfig(buildReport.Images["dockerfile"].DockerImageName)
 
 				By("state0: checking built images metadata")
-				// FIXME(ilya-lesikov): CHANGED_ARG not changed on Native Buildah, needs investigation, then uncomment
-				// Expect(config.Env).To(ContainElement("COMPOSED_ENV=env-was_changed"))
-				// Expect(config.Labels).To(HaveKeyWithValue("COMPOSED_LABEL", "label-was_changed"))
+				Expect(config.Env).To(ContainElement("COMPOSED_ENV=env-was_changed"))
+				Expect(config.Labels).To(HaveKeyWithValue("COMPOSED_LABEL", "label-was_changed"))
 				Expect(config.Shell).To(ContainElements("/bin/sh", "-c"))
 				Expect(config.User).To(Equal("0:0"))
 				Expect(config.WorkingDir).To(Equal("/"))
@@ -101,13 +99,11 @@ var _ = Describe("Build", func() {
 				))
 
 				By(`state1: getting built "dockerfile" image metadata`)
-				// FIXME(ilya-lesikov): CHANGED_ARG not changed on Native Buildah, needs investigation, then uncomment
-				// config := contRuntime.GetImageInspectConfig(buildReport.Images["dockerfile"].DockerImageName)
+				config := contRuntime.GetImageInspectConfig(buildReport.Images["dockerfile"].DockerImageName)
 
 				By("state1: checking built images metadata")
-				// FIXME(ilya-lesikov): CHANGED_ARG not changed on Native Buildah, needs investigation, then uncomment
-				// Expect(config.Env).To(ContainElement("COMPOSED_ENV=env-was_changed-state1"))
-				// Expect(config.Labels).To(HaveKeyWithValue("COMPOSED_LABEL", "label-was_changed-state1"))
+				Expect(config.Env).To(ContainElement("COMPOSED_ENV=env-was_changed-state1"))
+				Expect(config.Labels).To(HaveKeyWithValue("COMPOSED_LABEL", "label-was_changed-state1"))
 
 				By("state1: checking built images content")
 				contRuntime.ExpectCmdsToSucceed(
@@ -127,17 +123,33 @@ var _ = Describe("Build", func() {
 				)
 			}
 		},
-		Entry("without repo using Docker", false, "docker"),
-		Entry("with local repo using Docker", true, "docker"),
-		Entry("with local repo using Native Rootless Buildah", true, "native-rootless-buildah"),
-		Entry("with local repo using Docker-With-Fuse Buildah", true, "docker-with-fuse-buildah"),
+		Entry(
+			"without repo using Docker",
+			false, "docker", "",
+		),
+		Entry(
+			"with local repo using Docker",
+			true, "docker", "",
+		),
+		Entry(
+			"with local repo using Native Buildah with rootless isolation",
+			true, "native-rootless-buildah", "rootless",
+		),
+		Entry(
+			"with local repo using Native Buildah with chroot isolation",
+			true, "native-rootless-buildah", "chroot",
+		),
+		Entry(
+			"with local repo using Docker-With-Fuse Buildah with chroot isolation",
+			true, "docker-with-fuse-buildah", "chroot",
+		),
 		// TODO: uncomment when buildah allows building without --repo flag
 		// Entry("without repo using Native Rootless Buildah", false, contruntime.NativeRootlessBuildah),
 		// Entry("without repo using Docker-With-Fuse Buildah", false, contruntime.DockerWithFuseBuildah),
 	)
 })
 
-func setupEnv(withLocalRepo bool, containerRuntime string) {
+func setupEnv(withLocalRepo bool, containerRuntime, isolation string) {
 	switch containerRuntime {
 	case "docker":
 		if withLocalRepo {
@@ -156,6 +168,17 @@ func setupEnv(withLocalRepo bool, containerRuntime string) {
 		SuiteData.Stubs.SetEnv("WERF_CONTAINER_RUNTIME_BUILDAH", "docker-with-fuse")
 	default:
 		panic("unexpected containerRuntime")
+	}
+
+	switch isolation {
+	case "rootless":
+		SuiteData.Stubs.SetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION", "rootless")
+	case "chroot":
+		SuiteData.Stubs.SetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION", "chroot")
+	case "":
+		SuiteData.Stubs.UnsetEnv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION")
+	default:
+		panic("unexpected isolation")
 	}
 
 	if withLocalRepo {

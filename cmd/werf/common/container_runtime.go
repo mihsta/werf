@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/werf/werf/pkg/buildah"
+	"github.com/werf/werf/pkg/buildah/types"
 	"github.com/werf/werf/pkg/container_runtime"
 	"github.com/werf/werf/pkg/docker"
+	"github.com/werf/werf/pkg/util"
 )
 
 func ContainerRuntimeProcessStartupHook() (bool, error) {
@@ -26,6 +28,45 @@ func ContainerRuntimeProcessStartupHook() (bool, error) {
 
 func GetContainerRuntimeBuildahMode() buildah.Mode {
 	return buildah.Mode(os.Getenv("WERF_CONTAINER_RUNTIME_BUILDAH"))
+}
+
+func GetContainerRuntimeBuildahIsolation() (*types.Isolation, error) {
+	isolationRaw := os.Getenv("WERF_CONTAINER_RUNTIME_BUILDAH_ISOLATION")
+	var isolation types.Isolation
+	switch isolationRaw {
+	case "rootless", "oci-rootless":
+		if isInContainer, err := util.IsInContainer(); err != nil {
+			return nil, fmt.Errorf("unable to determine if is in container: %s", err)
+		} else if isInContainer {
+			return nil, fmt.Errorf("rootless isolation is not available in container: %s", err)
+		}
+		isolation = types.IsolationOCIRootless
+	case "chroot":
+		isolation = types.IsolationChroot
+	case "default", "":
+		var err error
+		isolation, err = buildah.GetDefaultIsolation()
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine default isolation: %s", err)
+		}
+	default:
+		return nil, fmt.Errorf("unexpected isolation specified: %s", isolationRaw)
+	}
+	return &isolation, nil
+}
+
+func GetContainerRuntimeBuildahStorageDriver() (*buildah.StorageDriver, error) {
+	storageDriverRaw := os.Getenv("WERF_CONTAINER_RUNTIME_BUILDAH_STORAGE_DRIVER")
+	var storageDriver buildah.StorageDriver
+	switch storageDriverRaw {
+	case string(buildah.StorageDriverOverlay), string(buildah.StorageDriverVFS):
+		storageDriver = buildah.StorageDriver(storageDriverRaw)
+	case "default", "":
+		storageDriver = buildah.DefaultStorageDriver
+	default:
+		return nil, fmt.Errorf("unexpected driver specified: %s", storageDriverRaw)
+	}
+	return &storageDriver, nil
 }
 
 func wrapContainerRuntime(containerRuntime container_runtime.ContainerRuntime) container_runtime.ContainerRuntime {
@@ -47,10 +88,22 @@ func InitProcessContainerRuntime(ctx context.Context, cmdData *CmdData) (contain
 			ctx = newCtx
 		}
 
+		isolation, err := GetContainerRuntimeBuildahIsolation()
+		if err != nil {
+			return nil, ctx, fmt.Errorf("unable to determine buildah container runtime isolation: %s", err)
+		}
+
+		storageDriver, err := GetContainerRuntimeBuildahStorageDriver()
+		if err != nil {
+			return nil, ctx, fmt.Errorf("unable to determine buildah container runtime storage driver: %s", err)
+		}
+
 		insecure := *cmdData.InsecureRegistry || *cmdData.SkipTlsVerifyRegistry
 		b, err := buildah.NewBuildah(resolvedMode, buildah.BuildahOpts{
 			CommonBuildahOpts: buildah.CommonBuildahOpts{
-				Insecure: insecure,
+				Insecure:      insecure,
+				Isolation:     isolation,
+				StorageDriver: storageDriver,
 			},
 		})
 		if err != nil {

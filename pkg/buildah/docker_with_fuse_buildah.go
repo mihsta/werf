@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/buildah/define"
 	"github.com/werf/lockgate"
 	"github.com/werf/logboek"
 	"github.com/werf/werf/pkg/buildah/types"
@@ -21,16 +22,31 @@ import (
 
 type DockerWithFuseBuildah struct {
 	BaseBuildah
+
+	commonBuildahCliArgs []string
+}
+
+type StoreOptions struct {
+	GraphDriverName    string
+	GraphDriverOptions []string
 }
 
 func NewDockerWithFuseBuildah(commonOpts CommonBuildahOpts, opts DockerWithFuseModeOpts) (*DockerWithFuseBuildah, error) {
 	b := &DockerWithFuseBuildah{}
 
-	baseBuildah, err := NewBaseBuildah(commonOpts.TmpDir, BaseBuildahOpts{Insecure: commonOpts.Insecure})
+	baseBuildah, err := NewBaseBuildah(commonOpts.TmpDir, BaseBuildahOpts{
+		Isolation: *commonOpts.Isolation,
+		Insecure:  commonOpts.Insecure,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create BaseBuildah: %s", err)
 	}
 	b.BaseBuildah = *baseBuildah
+
+	b.commonBuildahCliArgs, err = GetCommonBuildahCliArgs(*commonOpts.StorageDriver)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get common Buildah cli args: %s", err)
+	}
 
 	return b, nil
 }
@@ -70,23 +86,22 @@ func (b *DockerWithFuseBuildah) BuildFromDockerfile(ctx context.Context, dockerf
 		}
 	}()
 
-	var buildArgs []string
+	buildArgs := []string{
+		"bud", "--isolation", b.Isolation.String(), "--format", define.DOCKER,
+		fmt.Sprintf("--tls-verify=%s", strconv.FormatBool(!b.Insecure)),
+	}
 	for k, v := range opts.BuildArgs {
 		buildArgs = append(buildArgs, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
+	buildArgs = append(buildArgs, "-f", "/.werf/buildah/tmp/Dockerfile")
 
 	// NOTE: it is principal to use cli option --tls-verify=true|false form with equality sign, instead of separate arguments (--tls-verify true|false), because --tls-verify is by itself a boolean argument
-	budArgs := []string{"bud", "--format", "docker", fmt.Sprintf("--tls-verify=%s", strconv.FormatBool(!b.Insecure))}
-	budArgs = append(budArgs, buildArgs...)
-	budArgs = append(budArgs, "-f", "/.werf/buildah/tmp/Dockerfile")
-
 	output, _, err := b.runBuildah(
-		ctx,
-		[]string{
+		ctx, []string{
 			"--volume", fmt.Sprintf("%s:/.werf/buildah/tmp", sessionTmpDir),
 			"--workdir", "/.werf/buildah/tmp/context",
 		},
-		budArgs, opts.LogWriter,
+		buildArgs, opts.LogWriter,
 	)
 	if err != nil {
 		return "", err
@@ -104,13 +119,14 @@ func (b *DockerWithFuseBuildah) RunCommand(ctx context.Context, container string
 
 func (b *DockerWithFuseBuildah) FromCommand(ctx context.Context, container string, image string, opts FromCommandOpts) (string, error) {
 	_, _, err := b.runBuildah(ctx, []string{}, []string{
-		"from", fmt.Sprintf("--tls-verify=%s", strconv.FormatBool(!b.Insecure)), "--name", container, image,
+		"from", fmt.Sprintf("--tls-verify=%s", strconv.FormatBool(!b.Insecure)), "--name", container,
+		"--isolation", b.Isolation.String(), "--format", define.DOCKER, image,
 	}, opts.LogWriter)
 	// FIXME: return container name
 	return "", err
 }
 
-// TODO(ilya-lesikov): make it more generic to handle not only images
+// TODO: make it more generic to handle not only images
 func (b *DockerWithFuseBuildah) Inspect(ctx context.Context, ref string) (*types.BuilderInfo, error) {
 	stdout, stderr, err := b.runBuildah(ctx, []string{}, []string{"inspect", "--type", "image", ref}, nil)
 	if err != nil {
@@ -166,6 +182,7 @@ func (b *DockerWithFuseBuildah) runBuildah(ctx context.Context, dockerArgs []str
 	args := []string{"--rm"}
 	args = append(args, dockerArgs...)
 	args = append(args, BuildahWithFuseDockerArgs(BuildahStorageContainerName, docker.DockerConfigDir)...)
+	args = append(args, b.commonBuildahCliArgs...)
 	args = append(args, buildahArgs...)
 
 	if debug() {
@@ -220,6 +237,41 @@ func BuildahWithFuseDockerArgs(storageContainerName, dockerConfigDir string) []s
 		"--volumes-from", storageContainerName,
 		BuildahImage, "buildah",
 	}
+}
+
+func GetCommonBuildahCliArgs(driver StorageDriver) ([]string, error) {
+	var result []string
+
+	cliStoreOpts, err := newBuildahCliStoreOptions(driver)
+	if err != nil {
+		return result, fmt.Errorf("unable to get buildah cli store options: %s", err)
+	}
+
+	if cliStoreOpts.GraphDriverName != "" {
+		result = append(result, "--storage-driver", cliStoreOpts.GraphDriverName)
+	}
+
+	if len(cliStoreOpts.GraphDriverOptions) > 0 {
+		result = append(result, "--storage-opt", strings.Join(cliStoreOpts.GraphDriverOptions, ","))
+	}
+
+	return result, nil
+}
+
+func newBuildahCliStoreOptions(driver StorageDriver) (*StoreOptions, error) {
+	var graphDriverOptions []string
+	if driver == StorageDriverOverlay {
+		overlayOpts, err := GetOverlayOptions()
+		if err != nil {
+			return nil, fmt.Errorf("unable to get overlay options: %s", err)
+		}
+		graphDriverOptions = append(graphDriverOptions, overlayOpts...)
+	}
+
+	return &StoreOptions{
+		GraphDriverName:    string(driver),
+		GraphDriverOptions: graphDriverOptions,
+	}, nil
 }
 
 func scanLines(data string) []string {

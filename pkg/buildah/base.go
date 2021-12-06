@@ -7,22 +7,26 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/werf/werf/pkg/buildah/types"
 	"github.com/werf/werf/pkg/util"
 )
 
 type BaseBuildah struct {
-	TmpDir   string
-	Insecure bool
+	Isolation types.Isolation
+	TmpDir    string
+	Insecure  bool
 }
 
 type BaseBuildahOpts struct {
-	Insecure bool
+	Isolation types.Isolation
+	Insecure  bool
 }
 
 func NewBaseBuildah(tmpDir string, opts BaseBuildahOpts) (*BaseBuildah, error) {
 	b := &BaseBuildah{
-		TmpDir:   tmpDir,
-		Insecure: opts.Insecure,
+		Isolation: opts.Isolation,
+		TmpDir:    tmpDir,
+		Insecure:  opts.Insecure,
 	}
 
 	if err := os.MkdirAll(b.TmpDir, os.ModePerm); err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/werf/werf/pkg/buildah"
 	"github.com/werf/werf/test/pkg/thirdparty/contruntime/manifest"
 )
 
@@ -18,9 +19,9 @@ func NewContainerRuntime(name string) (ContainerRuntime, error) {
 		if runtime.GOOS != "linux" {
 			return nil, ErrRuntimeUnavailable
 		}
-		return NewNativeRootlessBuildahRuntime(), nil
+		return NewNativeRootlessBuildahRuntime(buildah.DefaultStorageDriver), nil
 	case "docker-with-fuse-buildah":
-		return NewDockerWithFuseBuildahRuntime(), nil
+		return NewDockerWithFuseBuildahRuntime(buildah.DefaultStorageDriver), nil
 	default:
 		panic(fmt.Sprint("unexpected name for container runtime: ", name))
 	}
